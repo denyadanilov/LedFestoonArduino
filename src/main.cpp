@@ -7,8 +7,11 @@
 #define GREEN_LED_PIN 16
 #define BUTTON_PIN 18
 #define DEBOUNCE_DELAY 50
+#define MONITOR_SPEED 115200
 
 enum class pin_mode { NONE, OUTPUT_MODE, INPUT_PULLUP_MODE };
+enum class voltage_state { RISING_STATE, FALLING_STATE, CHANGE_STATE };
+enum class pin_state { LOW_STATE, HIGH_STATE };
 
 typedef struct {
   uint8_t delay;
@@ -60,52 +63,44 @@ int current_sequence_index_ = 0;
 int current_item_index_ = 0;
 
 void setup_pin(int pin_index, pin_mode pin_mode);
+void attach_interrupt(int pin, void (*isr)(), voltage_state state);
+void change_pin_state(int pin, pin_state state);
 uint8_t pin_mode_to_arduino(pin_mode pin_mode);
+uint8_t voltage_state_to_arduino(voltage_state state);
+uint8_t pin_state_to_arduino(pin_state state);
 uint8_t get_next_sequence_index(uint8_t sequence_index, uint8_t sequence_num);
 uint8_t get_next_item_index(uint8_t item_index, uint8_t sequence_size);
-void reset_sequence_item(uint8_t sequence_index, uint8_t item_index);
+void activate_sequence_item(sequence_item &current_item);
+void reset_sequence_item(sequence_item &current_item);
 bool is_item_disabled(const sequence_item &item);
 bool is_item_completed(const sequence_item &item, unsigned long time);
 void on_button_clicked();
+bool try_change_sequence(sequence_item &current_item, unsigned long time);
 
 void setup() {
-  Serial.begin(115200);
-
-  while (!Serial) {
-    ; // wait for serial port to connect. Needed for native USB
-  }
-
   setup_pin(WHITE_LED_PIN, pin_mode::OUTPUT_MODE);
   setup_pin(BLUE_LED_PIN, pin_mode::OUTPUT_MODE);
   setup_pin(RED_LED_PIN, pin_mode::OUTPUT_MODE);
   setup_pin(YELLOW_LED_PIN, pin_mode::OUTPUT_MODE);
   setup_pin(GREEN_LED_PIN, pin_mode::OUTPUT_MODE);
   setup_pin(BUTTON_PIN, pin_mode::INPUT_PULLUP_MODE);
-  attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), on_button_clicked, RISING);
+  attach_interrupt(BUTTON_PIN, on_button_clicked, voltage_state::RISING_STATE);
 }
 
 void loop() {
-  if (button_clicked_ &&
-      (millis() - last_button_click_time_ > DEBOUNCE_DELAY)) {
-    Serial.println("Button clicked " + String(last_button_click_time_));
-  }
-
-  button_clicked_ = false;
-  last_button_click_time_ = millis();
-
+  auto time = millis();
   auto current_sequence = &sequences[current_sequence_index_];
   auto current_item = &current_sequence->items[current_item_index_];
-  auto time = millis();
 
   if (is_item_disabled(*current_item)) {
-    digitalWrite(current_item->led_pin, HIGH);
-    current_item->end_millis = time + current_item->delay;
+    activate_sequence_item(*current_item);
   } else if (is_item_completed(*current_item, time)) {
-    digitalWrite(current_item->led_pin, LOW);
-    reset_sequence_item(current_sequence_index_, current_item_index_);
+    reset_sequence_item(*current_item);
     current_item_index_ =
         get_next_item_index(current_item_index_, current_sequence->size);
   }
+
+  try_change_sequence(*current_item, time);
 }
 
 uint8_t get_next_sequence_index(uint8_t sequence_index, uint8_t sequence_num) {
@@ -124,9 +119,14 @@ uint8_t get_next_item_index(uint8_t item_index, uint8_t sequence_size) {
   return 0;
 }
 
-void reset_sequence_item(uint8_t sequence_index, uint8_t item_index) {
-  auto &item = sequences[sequence_index].items[item_index];
-  item.end_millis = 0;
+void reset_sequence_item(sequence_item &current_item) {
+  change_pin_state(current_item.led_pin, pin_state::LOW_STATE);
+  current_item.end_millis = 0;
+}
+
+void activate_sequence_item(sequence_item &current_item) {
+  change_pin_state(current_item.led_pin, pin_state::HIGH_STATE);
+  current_item.end_millis = millis() + current_item.delay;
 }
 
 bool is_item_disabled(const sequence_item &item) {
@@ -136,19 +136,26 @@ bool is_item_completed(const sequence_item &item, unsigned long time) {
   return item.end_millis < time;
 }
 
-void on_button_clicked() {
-  button_clicked_ = true;
-  /*
-  auto current_sequence = sequences + current_sequence_index_;
-  auto current_item = &current_sequence->items[current_item_index_];
-  digitalWrite(current_item->led_pin, LOW);
-  reset_sequence_item(current_sequence_index_, current_item_index_);
+bool try_change_sequence(sequence_item &current_item, unsigned long time) {
+  if (button_clicked_ && (time - last_button_click_time_ > DEBOUNCE_DELAY)) {
+    reset_sequence_item(current_item);
 
-  current_sequence_index_ =
-      get_next_sequence_index(current_sequence_index_, sequences_number);
-  current_item_index_ = 0;
-  */
+    current_sequence_index_ =
+        get_next_sequence_index(current_sequence_index_, sequences_number);
+    current_item_index_ = 0;
+
+    last_button_click_time_ = time;
+
+    button_clicked_ = false;
+
+    return true;
+  }
+
+  button_clicked_ = false;
+  return false;
 }
+
+void on_button_clicked() { button_clicked_ = true; }
 
 void setup_pin(int pin_index, pin_mode pin_mode) {
   auto pin_mode_arduino = pin_mode_to_arduino(pin_mode);
@@ -165,6 +172,47 @@ uint8_t pin_mode_to_arduino(pin_mode pin_mode) {
     break;
   default:
     return INPUT;
+    break;
+  }
+}
+
+void attach_interrupt(int pin, void (*isr)(), voltage_state state) {
+  auto state_arduino = voltage_state_to_arduino(state);
+  attachInterrupt(digitalPinToInterrupt(pin), isr, state_arduino);
+}
+
+uint8_t voltage_state_to_arduino(voltage_state state) {
+  switch (state) {
+  case voltage_state::RISING_STATE:
+    return RISING;
+    break;
+  case voltage_state::FALLING_STATE:
+    return FALLING;
+    break;
+  case voltage_state::CHANGE_STATE:
+    return CHANGE;
+    break;
+  default:
+    return RISING;
+    break;
+  }
+}
+
+void change_pin_state(int pin, pin_state state) {
+  auto state_arduino = pin_state_to_arduino(state);
+  digitalWrite(pin, state_arduino);
+}
+
+uint8_t pin_state_to_arduino(pin_state state) {
+  switch (state) {
+  case pin_state::HIGH_STATE:
+    return HIGH;
+    break;
+  case pin_state::LOW_STATE:
+    return LOW;
+    break;
+  default:
+    return LOW;
     break;
   }
 }
