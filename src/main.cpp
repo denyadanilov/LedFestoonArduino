@@ -1,7 +1,10 @@
 #include "adapter.h"
 #include "festoon_sequences.h"
+#include "loop_logger.h"
+#include <cstdio>
 
 void setup() {
+  initialize_logger();
   setup_pin(WHITE_LED_PIN, pin_mode::OUTPUT_MODE);
   setup_pin(BLUE_LED_PIN, pin_mode::OUTPUT_MODE);
   setup_pin(RED_LED_PIN, pin_mode::OUTPUT_MODE);
@@ -12,7 +15,9 @@ void setup() {
 }
 
 void loop() {
-  auto time = get_millis_from_start();
-  try_change_sequence(time);
-  updated_sequence(time);
+  log_loop_time([]() {
+    auto time = get_millis_from_start();
+    try_change_sequence(time);
+    updated_sequence(time);
+  });
 }

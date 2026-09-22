@@ -10,17 +10,22 @@ void setup_pin(int pin_index, pin_mode pin_mode) {
   pinMode(pin_index, pin_mode_arduino);
 }
 
-void attach_interrupt(int pin, void (*isr)(), voltage_state state) {
-  auto state_arduino = voltage_state_to_arduino(state);
-  attachInterrupt(digitalPinToInterrupt(pin), isr, state_arduino);
-}
-
 void change_pin_state(int pin, pin_state state) {
   auto state_arduino = pin_state_to_arduino(state);
   digitalWrite(pin, state_arduino);
 }
 
+void attach_interrupt(int pin, void (*isr)(), voltage_state state) {
+  auto state_arduino = voltage_state_to_arduino(state);
+  attachInterrupt(digitalPinToInterrupt(pin), isr, state_arduino);
+}
+
+void initialize_logger() { Serial.begin(115200); }
+
+void log_message(const char *message) { Serial.println(message); }
+
 unsigned long get_millis_from_start() { return ::millis(); }
+unsigned long get_micros_from_start() { return ::micros(); }
 
 uint8_t pin_mode_to_arduino(pin_mode pin_mode) {
   switch (pin_mode) {
