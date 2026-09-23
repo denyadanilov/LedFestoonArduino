@@ -26,16 +26,15 @@ sequence second_sequence_{
     .size = 5};
 
 sequence third_sequence_{
-    .items = (sequence_item[]){sequence_item{100, WHITE_LED_PIN, 0},
-                               sequence_item{80, BLUE_LED_PIN, 0},
-                               sequence_item{60, RED_LED_PIN, 0},
-                               sequence_item{40, YELLOW_LED_PIN, 0},
-                               sequence_item{20, GREEN_LED_PIN, 0},
-                               sequence_item{40, YELLOW_LED_PIN, 0},
-                               sequence_item{60, RED_LED_PIN, 0},
-                               sequence_item{80, BLUE_LED_PIN, 0},
-                               sequence_item{100, WHITE_LED_PIN, 0}},
-    .size = 10};
+    .items = (sequence_item[]){sequence_item{300, WHITE_LED_PIN, 0},
+                               sequence_item{250, BLUE_LED_PIN, 0},
+                               sequence_item{150, RED_LED_PIN, 0},
+                               sequence_item{250, YELLOW_LED_PIN, 0},
+                               sequence_item{300, GREEN_LED_PIN, 0},
+                               sequence_item{250, YELLOW_LED_PIN, 0},
+                               sequence_item{150, RED_LED_PIN, 0},
+                               sequence_item{250, BLUE_LED_PIN, 0}},
+    .size = 8};
 
 sequence sequences[sequences_number] = {first_sequence_, second_sequence_,
                                         third_sequence_};

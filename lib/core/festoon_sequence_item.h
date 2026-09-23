@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 typedef struct {
-  uint8_t delay;
+  uint16_t delay;
   uint8_t led_pin;
   unsigned long end_millis;
 } sequence_item;
